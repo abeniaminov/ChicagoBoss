@@ -24,8 +24,9 @@
 
 %% TODO REFACTOR AND TEST
 handle_request(Bridge, RouterAdapter) ->
+    Mod = erlang:element(1, Bridge),
     LoadedApplications = boss_web:get_all_applications(),
-    FullUrl = Bridge:path(),
+    FullUrl = Mod:path(Bridge),
 
     ApplicationForPath = RouterAdapter:find_application_for_path(Bridge,
                                                                   FullUrl,
@@ -41,12 +42,16 @@ handle_request(Bridge, RouterAdapter) ->
     end.
 
 handle_fatal_error(Bridge) ->
-    Response1 = (Bridge:status_code(500)):data(["An unhandled and unrecoverable error occurred. Please check error logs."]),
-    Response1.
+    Mod = erlang:element(1, Bridge),
+    Response1 = Mod:status_code(500, Bridge),
+    Mod1 = erlang:element(1, Response1),
+    Mod1:data(["An unhandled and unrecoverable error occurred. Please check error logs."], Response1).
 
 handle_application(Bridge, _FullUrl, undefined, _RouterAdapter) ->
-    Response1 = (Bridge:status_code(404)):data(["No application configured at this URL"]),
-    Response1;
+    Mod = erlang:element(1, Bridge),
+    Response1 = Mod:status_code(404, Bridge),
+    Mod1 = erlang:element(1, Response1),
+    Mod1:data(["No application configured at this URL"], Response1);
 handle_application(Bridge, FullUrl,  App, RouterAdapter) ->
     BaseURL      = boss_web:base_url(App),
     %DocRoot      = boss_files_util:static_path(App),
@@ -65,8 +70,9 @@ handle_application(Bridge, FullUrl,  App, RouterAdapter) ->
 
 
 handle_result(Bridge, _App, _StaticPrefix, Url, _IsSpecialFile = true, _) ->
+    Mod = erlang:element(1, Bridge),
     %lager:debug("sending static file ~p",[_StaticPrefix ++ Url]),
-    Bridge:set_response_file(_StaticPrefix ++ Url);
+    Mod:set_response_file(_StaticPrefix ++ Url, Bridge);
 handle_result(Bridge, App, StaticPrefix, Url, _IsSpecialFile = false, RouterAdapter) ->
     TestStaticPrefix = string:substr(Url, 1, length(StaticPrefix)),
     case TestStaticPrefix of
@@ -127,6 +133,7 @@ make_etag(App, StaticPrefix, File) ->
 
 %% TODO: Refactor
 build_dynamic_response(App, Bridge, Url, RouterAdapter) ->
+    Mod = erlang:element(1, Bridge),
     Mode            = boss_web_controller_util:execution_mode(App),
     AppInfo            = boss_web:application_info(App),
 
@@ -144,11 +151,11 @@ build_dynamic_response(App, Bridge, Url, RouterAdapter) ->
                                 ),
     {Time, {StatusCode, Headers, Payload}} = TR,
     ErrorFormat        = "~s ~s [~p] ~p ~pms",
-    RequestMethod    = Bridge:request_method(),
-    FullUrl        = Bridge:path(),
+    RequestMethod    = Mod:request_metho(Bridge),
+    FullUrl        = Mod:path(Bridge),
     ErrorArgs        = [RequestMethod, FullUrl, App, StatusCode, Time div 1000],
     log_status_code(StatusCode, ErrorFormat, ErrorArgs),
-    Response1        = Bridge:set_status_code(StatusCode),
+    Response1        = Mod:set_status_code(StatusCode, Bridge),
     Response2        = lists:foldl(fun({K, V}, Acc) ->
                           Acc:set_header(K, V)
                       end,
@@ -166,13 +173,15 @@ set_timer(Request, Url, Mode, AppInfo, TranslatorPid, RouterPid,
     timer:tc(?MODULE,process_request,[NewAppInfo, Request, Mode, Url, RouterAdapter]).
 
 handle_response(Bridge, _Payload = {stream, Generator, Acc0}, RequestMethod) ->
-    Protocol        = Bridge:protocol_version(),
+    Mod = erlang:element(1, Bridge),
+    Protocol        = Mod:protocol_version(Bridge),
     TransferEncoding    = handle_protocol(Protocol),
-    Response3        = Bridge:set_response_data(chunked),
+    Response3        = Mod:set_response_data(chunked, Bridge),
     Response3,
     process_stream_generator(Bridge, TransferEncoding, RequestMethod, Generator, Acc0);
 handle_response(Bridge, Payload , _RequestMethod) ->
-    Bridge:set_response_data(Payload).
+    Mod = erlang:element(1, Bridge),
+    Mod:set_response_data(Payload, Bridge).
 
 
 handle_protocol({1,1}) -> chunked;
@@ -190,13 +199,14 @@ log_status_code(_, ErrorFormat, ErrorArgs) ->
 process_stream_generator(_Req, _TransferEncoding, 'HEAD', _Generator, _Acc) ->
     ok;
 process_stream_generator(Req, chunked, Method, Generator, Acc) ->
+    Mod = erlang:element(1, Req),
     case Generator(Acc) of
         {output, Data, Acc1} ->
             case iolist_size(Data) of
                 0 -> ok;
                 Length ->
                     Chunk = [io_lib:format("~.16b\r\n", [Length]), Data, <<"\r\n">>],
-                    ok = mochiweb_socket:send(Req:socket(), Chunk)
+                    ok = mochiweb_socket:send(Mod:socket(Req), Chunk)
             end,
             process_stream_generator(Req, chunked, Method, Generator, Acc1);
         done -> ok = mochiweb_socket:send(Req:socket(), ["0\r\n\r\n"])

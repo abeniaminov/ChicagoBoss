@@ -151,13 +151,14 @@ build_dynamic_response(App, Bridge, Url, RouterAdapter) ->
                                 ),
     {Time, {StatusCode, Headers, Payload}} = TR,
     ErrorFormat        = "~s ~s [~p] ~p ~pms",
-    RequestMethod    = Mod:request_metho(Bridge),
+    RequestMethod    = Mod:request_method(Bridge),
     FullUrl        = Mod:path(Bridge),
     ErrorArgs        = [RequestMethod, FullUrl, App, StatusCode, Time div 1000],
     log_status_code(StatusCode, ErrorFormat, ErrorArgs),
     Response1        = Mod:set_status_code(StatusCode, Bridge),
     Response2        = lists:foldl(fun({K, V}, Acc) ->
-                          Acc:set_header(K, V)
+                          Mod = erlang:element(1, Acc),
+                          Mod:set_header(K, V, Acc)
                       end,
                       Response1,
                       Headers),
@@ -209,12 +210,13 @@ process_stream_generator(Req, chunked, Method, Generator, Acc) ->
                     ok = mochiweb_socket:send(Mod:socket(Req), Chunk)
             end,
             process_stream_generator(Req, chunked, Method, Generator, Acc1);
-        done -> ok = mochiweb_socket:send(Req:socket(), ["0\r\n\r\n"])
+        done -> ok = mochiweb_socket:send(Mod:socket(Req), ["0\r\n\r\n"])
     end;
 process_stream_generator(Req, identity, Method, Generator, Acc) ->
+    Mod = erlang:element(1, Req),
     case Generator(Acc) of
         {output, Data, Acc1} ->
-            mochiweb_socket:send(Req:socket(), Data),
+            mochiweb_socket:send(Mod:socket(Req), Data),
             process_stream_generator(Req, identity, Method, Generator, Acc1);
         done -> ok
     end.
@@ -372,6 +374,7 @@ process_result(AppInfo, Req, {moved, "http://"++Where, Headers}) ->
 process_result(AppInfo, Req, {moved, "https://"++Where, Headers}) ->
     process_result(AppInfo, Req, {moved_external, "https://"++Where, Headers});
 process_result(AppInfo, Req, {moved, {Application, Controller, Action, Params}, Headers}) ->
+    Mod = erlang:element(1, Req),
     RouterPid = if
         AppInfo#boss_app_info.application =:= Application ->
             AppInfo#boss_app_info.router_pid;
@@ -380,7 +383,7 @@ process_result(AppInfo, Req, {moved, {Application, Controller, Action, Params}, 
     end,
     ExtraParams = [{application, Application}, {controller, Controller}, {action, Action}],
     URL = boss_erlydtl_tags:url(ExtraParams ++ Params, [
-            {host, Req:header(host)},
+            {host, Mod:header(host, Req)},
             {base_url, AppInfo#boss_app_info.base_url},
             {application, AppInfo#boss_app_info.application},
             {router_pid, RouterPid}]),
@@ -402,6 +405,7 @@ process_result(AppInfo, Req, {redirect, "./"++Where, Headers}) ->
 process_result(AppInfo, Req, {redirect, "../"++Where, Headers}) ->
     process_result(AppInfo, Req, {redirect_external, "../"++Where, Headers});
 process_result(AppInfo, Req, {redirect, {Application, Controller, Action, Params}, Headers}) ->
+    Mod = erlang:element(1, Req),
     {RouterPid, AppInfo1, Application1} = if
         AppInfo#boss_app_info.application =:= Application ->
             {AppInfo#boss_app_info.router_pid, AppInfo, Application};
@@ -410,7 +414,7 @@ process_result(AppInfo, Req, {redirect, {Application, Controller, Action, Params
     end,
     ExtraParams = [{application, Application1}, {controller, Controller}, {action, Action}],
     URL = boss_erlydtl_tags:url(ExtraParams ++ Params, [
-            {host, Req:header(host)},
+            {host, Mod:header(host, Req)},
             {base_url, AppInfo1#boss_app_info.base_url},
             {application, AppInfo1#boss_app_info.application},
             {router_pid, RouterPid}]),

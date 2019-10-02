@@ -52,23 +52,25 @@ init(Application, Controller, ControllerList, _RequestContext) ->
 
 filters(Type, {_, ExportStrings} = Info, RequestContext, GlobalFilters) ->
     ControllerInstance = get_instance(Info, RequestContext),
+    Mod = erlang:element(1, ControllerInstance),
     FunctionString = lists:concat([Type, "_filters"]),
     case proplists:get_value(FunctionString, ExportStrings) of
         3 ->
             FunctionAtom = list_to_atom(FunctionString),
-            ControllerInstance:FunctionAtom(GlobalFilters, RequestContext);
+            Mod:FunctionAtom(GlobalFilters, RequestContext, ControllerInstance);
         _ -> GlobalFilters
     end.
 
 before_filter({_, ExportStrings} = Info, RequestContext) ->
     ControllerInstance    = get_instance(Info, RequestContext),
+    Mod = erlang:element(1, ControllerInstance),
     Action        = proplists:get_value(action, RequestContext),
     RequestMethod    = proplists:get_value(method, RequestContext),
     Tokens        = proplists:get_value(tokens, RequestContext),
 
     AuthResult = case proplists:get_value("before_", ExportStrings) of
-        2 -> ControllerInstance:before_(Action);
-        4 -> ControllerInstance:before_(Action, RequestMethod, Tokens);
+        2 -> Mod:before_(Action, ControllerInstance);
+        4 -> Mod:before_(Action, RequestMethod, Tokens, ControllerInstance);
         _ -> no_before_function
     end,
     case AuthResult of
@@ -84,17 +86,19 @@ before_filter({_, ExportStrings} = Info, RequestContext) ->
 
 after_filter({_, ExportStrings} = Info, RequestContext, Result) ->
     ControllerInstance = get_instance(Info, RequestContext),
+    Mod = erlang:element(1, ControllerInstance),
     Action = proplists:get_value(action, RequestContext),
     AuthInfo = proplists:get_value('_before', RequestContext, RequestContext),
 
     case proplists:get_value("after_", ExportStrings) of
-        3 -> ControllerInstance:after_(Action, Result);
-        4 -> ControllerInstance:after_(Action, Result, AuthInfo);
+        3 -> Mod:after_(Action, Result, ControllerInstance);
+        4 -> Mod:after_(Action, Result, AuthInfo, ControllerInstance);
         _ -> Result
     end.
 
 action({_, ExportStrings} = Info, RequestContext) ->
     ControllerInstance    = get_instance(Info, RequestContext),
+    Mod = erlang:element(1, ControllerInstance),
     Action        = proplists:get_value(action, RequestContext),
     RequestMethod    = proplists:get_value(method, RequestContext),
     Tokens        = proplists:get_value(tokens, RequestContext),
@@ -103,9 +107,9 @@ action({_, ExportStrings} = Info, RequestContext) ->
 
     case proplists:get_value(Action, ExportStrings) of
         3 ->
-            ControllerInstance:ActionAtom(RequestMethod, Tokens);
+            Mod:ActionAtom(RequestMethod, Tokens, ControllerInstance);
         4 ->
-            ControllerInstance:ActionAtom(RequestMethod, Tokens, AuthInfo);
+            Mod:ActionAtom(RequestMethod, Tokens, AuthInfo, ControllerInstance);
         _ ->
         CMod = element(1, ControllerInstance),
         _ = lager:notice("[ChicagoBoss] The function ~p:~s/2 is not exported, "++
@@ -116,23 +120,25 @@ action({_, ExportStrings} = Info, RequestContext) ->
 
 filter_config({_, ExportStrings} = Info, 'cache', Default, RequestContext) ->
     ControllerInstance = get_instance(Info, RequestContext),
+    Mod = erlang:element(1, ControllerInstance),
     Action = proplists:get_value(action, RequestContext),
     Tokens = proplists:get_value(tokens, RequestContext),
     AuthInfo = proplists:get_value('_before', RequestContext, RequestContext),
 
     case proplists:get_value("cache_", ExportStrings) of
-        3 -> ControllerInstance:cache_(Action, Tokens);
-        4 -> ControllerInstance:cache_(Action, Tokens, AuthInfo);
+        3 -> Mod:cache_(Action, Tokens, ControllerInstance);
+        4 -> Mod:cache_(Action, Tokens, AuthInfo, ControllerInstance);
         _ -> filter_config1(Info, 'cache', Default, RequestContext)
     end;
 filter_config({_, ExportStrings} = Info, 'lang', Default, RequestContext) ->
     ControllerInstance = get_instance(Info, RequestContext),
+    Mod = erlang:element(1, ControllerInstance),
     Action = proplists:get_value(action, RequestContext),
     AuthInfo = proplists:get_value('_before', RequestContext, RequestContext),
 
     case proplists:get_value("lang_", ExportStrings) of
-        2 -> ControllerInstance:lang_(Action);
-        3 -> ControllerInstance:lang_(Action, AuthInfo);
+        2 -> Mod:lang_(Action, ControllerInstance);
+        3 -> Mod:lang_(Action, AuthInfo, ControllerInstance);
         _ -> filter_config1(Info, 'lang', Default, RequestContext)
     end;
 filter_config(Info, FilterModule, Default, RequestContext) ->
@@ -140,7 +146,8 @@ filter_config(Info, FilterModule, Default, RequestContext) ->
 
 filter_config1({_, ExportStrings} = Info, FilterKey, Default, RequestContext) ->
     ControllerInstance = get_instance(Info, RequestContext),
+    Mod = erlang:element(1, ControllerInstance),
     case proplists:get_value("config", ExportStrings) of
-        4 -> ControllerInstance:config(FilterKey, Default, RequestContext);
+        4 -> Mod:config(FilterKey, Default, RequestContext, ControllerInstance);
         _ -> Default
     end.

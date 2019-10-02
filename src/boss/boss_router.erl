@@ -85,7 +85,8 @@ set_controllers(Pid, Controllers) ->
     gen_server:call(Pid, {set_controllers, Controllers}).
 
 find_application_for_path(Req, Path, Applications) ->
-    Host    = Req:header(host),
+    Mod = erlang:element(1, Req),
+    Host    = Mod:header(host, Req),
     UseHost = case Host of
         undefined -> undefined;
         _ -> hd(re:split(Host, ":", [{return, list}]))

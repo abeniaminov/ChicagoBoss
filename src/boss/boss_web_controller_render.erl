@@ -264,10 +264,10 @@ render_view({Controller, Template, _}, AppInfo, RequestContext, Variables, Heade
 render_with_template(Controller, Template, AppInfo, RequestContext,
                      Variables, Headers, Req, BossFlash, SessionData, Module,
                      TemplateAdapter) ->
-
+    Mod = erlang:element(1, Req),
     TranslatableStrings = TemplateAdapter:translatable_strings(Module),
     TranslatorPid = AppInfo#boss_app_info.translator_pid,
-    AcceptLanguage = Req:header(accept_language),
+    AcceptLanguage = Mod:header(accept_language, Req),
     ContentLanguage = extract_content_language(RequestContext, Headers),
 
     {Lang, TranslationFun} = choose_translation_fun(TranslatorPid, TranslatableStrings,
@@ -283,7 +283,7 @@ render_with_template(Controller, Template, AppInfo, RequestContext,
     RenderOptions = [
             {translation_fun, TranslationFun},
             {locale, Lang},
-            {host, Req:header(host)},
+            {host, Mod:header(host, Req)},
             {application, atom_to_list(AppInfo#boss_app_info.application)},
             {controller, Controller},
             {action, Template},

@@ -146,16 +146,17 @@ get_csrf_token(Request) ->
 
 check_referer(Req) ->
     %% Check referer, if needed
-    case Req:protocol() of
+    Mod = erlang:element(1, Req),
+    case Mod:protocol(Req) of
         http ->
             true;
         Protocol ->
             %% Check referer, only on secure requests
-            case proplists:get_value(referer, Req:headers()) of
+            case proplists:get_value(referer, Mod:headers(Req)) of
                 undefined ->
                     false;
                 _Referer -> %% TODO: Finish referer check
-                    same_host(Req:header("referer"), Protocol, Req:header("host"))
+                    same_host(Mod:header("referer", Req), Protocol, Mod:header("host", Req))
             end
     end.
 

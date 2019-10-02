@@ -253,6 +253,7 @@ execute_action_check_for_circular_redirect(Controller, Action, Tokens,
 
 execute_action_inner(Controller, Action, Tokens, Location, AppInfo,
                      RequestContext, LocationTrail, Req, SessionID) ->
+    Mod = erlang:element(1, Req),                 
     % do not convert a list to an atom until we are sure the controller/action
     % pair exists. this prevents a memory leak due to atom creation.
     Adapters                            = [boss_controller_adapter_pmod,
@@ -261,7 +262,7 @@ execute_action_inner(Controller, Action, Tokens, Location, AppInfo,
     Adapter                             = make_action_adapter(Controller, AppInfo, Adapters),
     SessionID1                          = make_action_session_id(Controller, AppInfo, Req,
                                                                  SessionID, Adapter),
-    RequestMethod                       = Req:request_method(),
+    RequestMethod                       = Mod:request_method(Req),
     RequestContext1                     = [{request, Req},
                                            {session_id, SessionID1},
                                            {method, RequestMethod},
@@ -286,9 +287,10 @@ execute_action_inner(Controller, Action, Tokens, Location, AppInfo,
     {FinalResult, SessionID1}.
 
 apply_action(Req, Adapter, AdapterInfo, RequestContext2) ->
+    Mod = erlang:element(1, Req),
     case apply_before_filters(Adapter, AdapterInfo, RequestContext2) of
     {ok, RC3} ->
-        EffectiveRequestMethod = case Req:request_method() of
+        EffectiveRequestMethod = case Mod:request_method(Req) of
                      'HEAD' -> 'GET';
                      Method -> Method
                      end,

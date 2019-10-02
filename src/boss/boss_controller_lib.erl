@@ -15,8 +15,9 @@
 
 convert_params_to_tokens(Variables, ControllerModule, Action) ->
     DummyController = apply(ControllerModule, new, lists:seq(1, proplists:get_value(new, ControllerModule:module_info(exports)))),
+    Mod = erlang:element(1, DummyController),
     Routes = case lists:member({'_routes', 1}, ControllerModule:module_info(exports)) of
-        true -> DummyController:'_routes'();
+        true -> Mod:'_routes'(DummyController);
         false -> []
     end,
     lists:foldr(fun

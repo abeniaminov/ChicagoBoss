@@ -30,9 +30,10 @@ before_filter({page, _}, RequestContext) ->
             Language = proplists:get_value(language, RequestContext, auto),
             ControllerModule = proplists:get_value(controller_module, RequestContext),
             Action = proplists:get_value(action, RequestContext),
-            Tokens = proplists:get_value(tokens, RequestContext, []),
+            Tokens = proplists:get_value(tokens, RequestContext, []),            
             Req = proplists:get_value(request, RequestContext, []),
-            Query = Req:query_params(),
+            Mod = erlang:element(1, Req),
+            Query = Mod:query_params(Req),
 
             CacheKey = {ControllerModule, Action, Tokens, Language, Query},
 
